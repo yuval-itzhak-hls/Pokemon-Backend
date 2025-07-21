@@ -117,12 +117,9 @@ export class UsersService {
 
     try {
       await this.cognitoClient.send(command);
-      
     } catch (error) {
       throw new Error(`Confirmation failed: ${error.message}`);
     }
-
-
   }
 
 

@@ -52,7 +52,7 @@ export class UsersService {
     const { email, password } = signupDto;
     const passwordHash = await bcrypt.hash(password, 10);
     
-    const existingUser = await this.userModel.findOne({ email });
+    const existingUser = await this.userModel.findOne({ email }).populate('caughtPokemons');
     if (existingUser) {
       throw new Error('User already exists');
     }

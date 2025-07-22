@@ -14,7 +14,7 @@ import { PokemonsService } from './pokemons.service';
 import { CognitoGuard } from 'src/users/guard/cognito.guard';
 
 @Controller('pokemons')
-// @UseGuards(CognitoGuard)
+@UseGuards(CognitoGuard)
 export class PokemonsController {
   constructor(private readonly pokemonsService: PokemonsService) {}
   
@@ -27,10 +27,9 @@ export class PokemonsController {
     @Query('sortBy') sortBy?: string,
     @Query('order') order?: string,
   ) {
-    const userId = (req as any).user?.sub;
-    // const email = (req as any).user?.email;
+    const email = (req as any).user?.email;
  
-      return this.pokemonsService.findWithFilters(userId, {
+      return this.pokemonsService.findWithFilters(email, {
         mine,
         current,
         search,

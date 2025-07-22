@@ -50,6 +50,7 @@ export class CognitoGuard implements CanActivate {
             return reject(new UnauthorizedException('Invalid token'));
           }
 
+          console.log('Decoded JWT payload:', decoded);
           (request as any).user = decoded;
           resolve(true);
         },

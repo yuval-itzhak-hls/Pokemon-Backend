@@ -21,7 +21,7 @@ export class PokemonsService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
   ) {}
 
-   async findWithFilters(userId: string, filters: {
+   async findWithFilters(email: string, filters: {
     mine?: string;
     current?: string;
     search?: string;
@@ -30,7 +30,7 @@ export class PokemonsService {
     }): Promise<Pokemon[]> {
         
         const user = await this.userModel
-            .findOne({ sub: userId })
+            .findOne({ email })
             .populate('caughtPokemons')
             .lean();
 

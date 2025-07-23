@@ -1,17 +1,15 @@
-// src/pokemons/pokemons.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Pokemon, PokemonDocument } from './schemas/pokemon.schema';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { Model } from 'mongoose';
-import { UsersModule } from '../users/users.module';
 
-type FilterOptions = {
-  mine?: string;
-  current?: string;
-  search?: string;
-  sortBy?: string;
-  order?: string;
+export type PaginatedPokemons = {
+  data: Pokemon[];
+  totalCount: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 @Injectable()
@@ -21,76 +19,106 @@ export class PokemonsService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
   ) {}
 
-   async findWithFilters(email: string, filters: {
-    mine?: string;
-    current?: string;
-    search?: string;
-    sortBy?: string;
-    order?: string;
-    }): Promise<Pokemon[]> {
-        
-        const user = await this.userModel
-            .findOne({ email })
-            .populate('caughtPokemons')
-            .lean();
+  async findWithFilters(
+    email: string,
+    filters: {
+      mine?: string;
+      current?: string;
+      search?: string;
+      sortBy?: string;
+      order?: string;
+      page?: number;
+      limit?: number;
+    },
+  ): Promise<PaginatedPokemons> {
 
-        if (!user) {
-            throw new NotFoundException('User not found');
-        }
+    const user = await this.userModel.findOne({ email }).lean(); // No need to populate caughtPokemons here yet
 
-        const allPokemonDocs = await this.pokemonModel.find().lean();
-
-        let pokemons: Pokemon[];
-
-        if (filters.mine === 'true') {
-            const myIds = user.caughtPokemons.map(p => p.toString());
-            pokemons = allPokemonDocs.filter(p => myIds.includes(p._id.toString()));
-        } else if (filters.mine === 'false') {
-            const myIds = user.caughtPokemons.map(p => p.toString());
-            pokemons = allPokemonDocs.filter(p => !myIds.includes(p._id.toString()));
-        } else {
-            pokemons = allPokemonDocs;
-        }
-
-        if (filters.current) {
-            pokemons = pokemons.filter(p => p.id !== filters.current);
-        }
-
-        if (filters.search) {
-            const regex = new RegExp(filters.search, 'i');
-            pokemons = pokemons.filter(p =>
-            regex.test(p.name),
-            );
-        }
-
-        if (filters.sortBy) {
-            const sortKey = filters.sortBy as keyof Pokemon;
-            const order = filters.order === 'desc' ? -1 : 1;
-            pokemons = pokemons.sort((a, b) => {
-            const aVal = a[sortKey];
-            const bVal = b[sortKey];
-            if (typeof aVal === 'string' && typeof bVal === 'string') {
-                return aVal.localeCompare(bVal) * order;
-            }
-            if (typeof aVal === 'number' && typeof bVal === 'number') {
-                return (aVal - bVal) * order;
-            }
-            return 0;
-            });
-        }
-
-        
-        return pokemons;
+    if (!user) {
+      throw new NotFoundException('User not found');
     }
 
+    const query: any = {};
+    let pokemonIdsToFilter: string[] | null = null; 
 
-    async findOne(id: string): Promise<Pokemon> {
-        const pokemon = await this.pokemonModel.findOne({ id }).exec();
-        if (!pokemon) {
-        throw new NotFoundException(`Pokemon with id ${id} not found`);
-        }
-        return pokemon;
+    if (filters.mine === 'true') {
+      const userWithCaughtPokemons = await this.userModel
+        .findOne({ email })
+        .populate('caughtPokemons')
+        .lean();
+      if (userWithCaughtPokemons && userWithCaughtPokemons.caughtPokemons) {
+
+        pokemonIdsToFilter = userWithCaughtPokemons.caughtPokemons.map((p: any) => p._id.toString());
+        query._id = { $in: pokemonIdsToFilter };
+
+      } else {
+        return {
+          data: [],
+          totalCount: 0,
+          page: filters.page || 1,
+          limit: filters.limit || 10,
+          totalPages: 0,
+        };
+      }
+    } else if (filters.mine === 'false') {
+
+      const userWithCaughtPokemons = await this.userModel
+        .findOne({ email })
+        .populate('caughtPokemons')
+        .lean();
+      if (userWithCaughtPokemons && userWithCaughtPokemons.caughtPokemons) {
+        pokemonIdsToFilter = userWithCaughtPokemons.caughtPokemons.map((p: any) => p._id.toString());
+        query._id = { $nin: pokemonIdsToFilter };
+      }
     }
 
+    if (filters.current) {
+      if (query._id) {
+        query._id = { ...query._id, $ne: filters.current };
+      } else {
+        query._id = { $ne: filters.current };
+      }
+    }
 
+    if (filters.search) {
+      const regex = new RegExp(filters.search, 'i');
+      query.name = { $regex: regex };
+    }
+
+    const sortOptions: any = {};
+    if (filters.sortBy) {
+      sortOptions[filters.sortBy] = filters.order === 'desc' ? -1 : 1;
+    }
+
+    const page = filters.page ? parseInt(filters.page.toString(), 10) : 1;
+    const limit = filters.limit ? parseInt(filters.limit.toString(), 10) : 10;
+    const skip = (page - 1) * limit;
+
+    const totalCount = await this.pokemonModel.countDocuments(query);
+
+    const pokemons = await this.pokemonModel
+      .find(query)
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(limit)
+      .lean(); // Use .lean() for plain JavaScript objects, better performance
+
+    const totalPages = Math.ceil(totalCount / limit);
+
+    return {
+      data: pokemons,
+      totalCount,
+      page,
+      limit,
+      totalPages,
+    };
+  }
+
+  async findOne(id: string): Promise<Pokemon> {
+    const pokemon = await this.pokemonModel.findOne({ id }).exec();
+    if (!pokemon) {
+      throw new NotFoundException(`Pokemon with id ${id} not found`);
+    }
+    return pokemon;
+  }
 }

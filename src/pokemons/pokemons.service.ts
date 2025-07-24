@@ -2,7 +2,8 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Pokemon, PokemonDocument } from './schemas/pokemon.schema';
 import { User, UserDocument } from '../users/schemas/user.schema';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
+
 
 export type PaginatedPokemons = {
   data: Pokemon[];
@@ -121,4 +122,29 @@ export class PokemonsService {
     }
     return pokemon;
   }
+
+  
+  async catchPokemon(email: string, pokemonId: string): Promise<void> {
+    const user = await this.userModel.findOne({ email });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+
+    const pokemon = await this.pokemonModel.findOne({ id: pokemonId });
+    if (!pokemon) {
+      throw new NotFoundException('Pokemon not found');
+    }
+
+    const objectId = pokemon._id as Types.ObjectId;
+
+    if (user.caughtPokemons.includes(objectId)) {
+      return;
+    }
+
+    user.caughtPokemons.push(objectId);
+    await user.save();
+  }
+
+
 }

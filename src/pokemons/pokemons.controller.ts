@@ -48,4 +48,16 @@ export class PokemonsController {
   async findOne(@Param('id') id: string): Promise<Pokemon> { 
     return this.pokemonsService.findOne(id);
   }
+
+  @Post(':id/catch')
+  async catchPokemon(
+    @Req() req: Request,
+    @Param('id') pokemonId: string,
+  ): Promise<{ message: string }> {
+    const email = (req as any).user?.email;
+    await this.pokemonsService.catchPokemon(email, pokemonId);
+    return { message: 'Pokemon caught successfully' };
+  }
+
+
 }

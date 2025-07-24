@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { User, UserDocument } from './schemas/user.schema';
+import { Pokemon, PokemonDocument } from '../pokemons/schemas/pokemon.schema';
 import * as bcrypt from 'bcryptjs';
 import { SignupDto } from './dto/signup.dto';
 import { SigninDto } from './dto/signin.dto';
@@ -24,6 +25,7 @@ export class UsersService {
 
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(Pokemon.name) private pokemonModel: Model<PokemonDocument>,
     private configService: ConfigService,
   ) {
     this.userPoolId = this.configService.get<string>('COGNITO_USER_POOL_ID')!;
@@ -46,7 +48,6 @@ export class UsersService {
   }
 
 
-
   async signup(signupDto: SignupDto): Promise<SignUpCommandOutput> {
     console.log('Signup DTO:', signupDto);
     const { email, password } = signupDto;
@@ -57,7 +58,12 @@ export class UsersService {
       throw new Error('User already exists');
     }
 
-    const createdUser = new this.userModel({ email, password: passwordHash });
+   
+    const createdUser = new this.userModel({
+      email,
+      password: passwordHash,
+      caughtPokemons: [],
+    });
     await createdUser.save();
 
     const command = new SignUpCommand({
@@ -78,8 +84,6 @@ export class UsersService {
       throw error;
     }
   }
-
-
 
   async signin(signinDto: SigninDto): Promise<AuthenticationResultType> {
     const { email, password } = signinDto;
@@ -106,25 +110,30 @@ export class UsersService {
     }
   }
 
-  
   async confirmSignUp(email: string, code: string): Promise<void> {
-    const command = new ConfirmSignUpCommand({
-      ClientId: this.clientId,
-      Username: email,
-      ConfirmationCode: code,
-      SecretHash: this.generateSecretHash(email),
-    });
+  const command = new ConfirmSignUpCommand({
+    ClientId: this.clientId,
+    Username: email,
+    ConfirmationCode: code,
+    SecretHash: this.generateSecretHash(email),
+  });
 
-    try {
-      await this.cognitoClient.send(command);
-    } catch (error) {
-      throw new Error(`Confirmation failed: ${error.message}`);
-    }
+  try {
+    await this.cognitoClient.send(command);
+
+    const user = await this.userModel.findOne({ email });
+      if (!user) {
+        throw new Error('User not found in MongoDB');
+      }
+
+      // add 5 random pokemons
+    const randomPokemons = await this.pokemonModel.aggregate([{ $sample: { size: 5 } }]);
+    user.caughtPokemons.push(...randomPokemons.map(p => p._id));
+    await user.save();
+
+  } catch (error) {
+    throw new Error(`Confirmation failed: ${error.message}`);
   }
+}
 
-
-  async hashPassword(plainPassword: string): Promise<string> {
-    const saltRounds = 10;
-    return await bcrypt.hash(plainPassword, saltRounds);
-  }
 }

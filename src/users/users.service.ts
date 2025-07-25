@@ -137,7 +137,11 @@ export class UsersService {
   }
 }
 
-  async signout(accessToken: string): Promise<void> {
+  async signout(authHeader: string): Promise<void> {
+    const accessToken = authHeader?.replace(/^Bearer\s/, '');
+    if (!accessToken) {
+      throw new Error('Access token required');
+    }
     const command = new GlobalSignOutCommand({
       AccessToken: accessToken,
     });

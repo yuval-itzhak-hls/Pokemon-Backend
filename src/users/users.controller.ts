@@ -24,12 +24,7 @@ export class UsersController {
 
   @Post('signout')
   async signout(@Headers('authorization') authHeader: string) {
-    // Expecting header: Authorization: Bearer <token>
-    const accessToken = authHeader?.replace(/^Bearer\s/, '');
-    if (!accessToken) {
-      throw new Error('Access token required');
-    }
-    await this.usersService.signout(accessToken);
+    await this.usersService.signout(authHeader);
     return { message: 'Signed out successfully' };
   }
 }

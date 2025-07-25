@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User, UserDocument } from './schemas/user.schema';
@@ -53,13 +53,12 @@ export class UsersService {
     console.log('Signup DTO:', signupDto);
     const { email, password } = signupDto;
     const passwordHash = await bcrypt.hash(password, 10);
-    
+
     const existingUser = await this.userModel.findOne({ email }).populate('caughtPokemons');
     if (existingUser) {
-      throw new Error('User already exists');
+      throw new ConflictException('User already exists');
     }
 
-   
     const createdUser = new this.userModel({
       email,
       password: passwordHash,
@@ -80,9 +79,20 @@ export class UsersService {
     try {
       const response = await this.cognitoClient.send(command);
       return response;
-    } catch (error) {
+    } catch (error: any) {
       await this.userModel.deleteOne({ email });
-      throw error;
+
+      if (error.name === 'UsernameExistsException') {
+        throw new ConflictException('User already exists');
+      }
+      if (error.name === 'InvalidPasswordException') {
+        throw new BadRequestException('Password does not meet requirements');
+      }
+      if (error.name === 'InvalidParameterException') {
+        throw new BadRequestException('Invalid signup parameters');
+      }
+
+      throw new BadRequestException(error.message);
     }
   }
 

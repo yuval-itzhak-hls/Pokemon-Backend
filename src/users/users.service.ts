@@ -13,6 +13,7 @@ import {
   CognitoIdentityProviderClient,
   SignUpCommand,
   AdminInitiateAuthCommand,
+  GlobalSignOutCommand
 } from '@aws-sdk/client-cognito-identity-provider';
 import { ConfigService } from '@nestjs/config';
 
@@ -136,4 +137,15 @@ export class UsersService {
   }
 }
 
+  async signout(accessToken: string): Promise<void> {
+    const command = new GlobalSignOutCommand({
+      AccessToken: accessToken,
+    });
+
+    try {
+      await this.cognitoClient.send(command);
+    } catch (error) {
+      throw new Error(`Signout failed: ${error.message}`);
+    }
+  }
 }

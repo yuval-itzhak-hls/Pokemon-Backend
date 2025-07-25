@@ -1,4 +1,4 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body, Headers } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { SignupDto } from './dto/signup.dto';
 import { SigninDto } from './dto/signin.dto';
@@ -22,4 +22,14 @@ export class UsersController {
     return this.usersService.confirmSignUp(body.email, body.code);
   }
 
+  @Post('signout')
+  async signout(@Headers('authorization') authHeader: string) {
+    // Expecting header: Authorization: Bearer <token>
+    const accessToken = authHeader?.replace(/^Bearer\s/, '');
+    if (!accessToken) {
+      throw new Error('Access token required');
+    }
+    await this.usersService.signout(accessToken);
+    return { message: 'Signed out successfully' };
+  }
 }

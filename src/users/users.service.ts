@@ -99,6 +99,11 @@ export class UsersService {
   async signin(signinDto: SigninDto): Promise<AuthenticationResultType> {
     const { email, password } = signinDto;
 
+    const existingUser = await this.userModel.findOne({ email }).populate('caughtPokemons');
+    if (!existingUser) {
+      throw new ConflictException('User does not exists');
+    }
+
     const command = new AdminInitiateAuthCommand({
       UserPoolId: this.userPoolId,
       ClientId: this.clientId,
@@ -113,11 +118,20 @@ export class UsersService {
     try {
       const response = await this.cognitoClient.send(command);
       if (!response.AuthenticationResult) {
-        throw new Error('Authentication failed');
+        throw new BadRequestException('Authentication failed');
       }
       return response.AuthenticationResult;
-    } catch (error) {
-      throw error;
+    } catch (error: any) {
+      if (error.name === 'NotAuthorizedException') {
+        throw new BadRequestException('Incorrect username or password');
+      }
+      if (error.name === 'UserNotFoundException') {
+        throw new BadRequestException('User does not exist');
+      }
+      if (error.name === 'UserNotConfirmedException') {
+        throw new BadRequestException('User is not confirmed');
+      }
+      throw new BadRequestException(error.message);
     }
   }
 

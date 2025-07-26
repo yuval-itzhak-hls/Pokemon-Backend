@@ -140,6 +140,15 @@ export class UsersService {
       // add 5 random pokemons
     const randomPokemons = await this.pokemonModel.aggregate([{ $sample: { size: 5 } }]);
     user.caughtPokemons.push(...randomPokemons.map(p => p._id));
+
+    // Set isMyPokemon = true for each selected pokemon
+    for (const pokemon of randomPokemons) {
+      await this.pokemonModel.updateOne(
+        { _id: pokemon._id },
+        { $set: { isMyPokemon: true } }
+      );
+    }
+
     await user.save();
 
   } catch (error) {

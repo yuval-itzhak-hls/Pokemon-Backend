@@ -123,7 +123,7 @@ export class PokemonsService {
     return pokemon;
   }
 
-  
+
   async catchPokemon(email: string, pokemonId: string): Promise<void> {
     const user = await this.userModel.findOne({ email });
     if (!user) {
@@ -143,7 +143,10 @@ export class PokemonsService {
     }
 
     user.caughtPokemons.push(objectId);
+    pokemon.isMyPokemon = true;
     await user.save();
+    await pokemon.save();
+
   }
 
 
